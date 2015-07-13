@@ -3,6 +3,7 @@
 
 import serialize = require('./serialize');
 import utils = require('./utils');
+import comm = require('./comm');
 
 import Signal = phosphor.core.Signal;
 import emit = phosphor.core.emit;
@@ -183,6 +184,9 @@ class Kernel {
 
     this._sessionId = utils.uuid();
     this._handlerMap = new Map<string, KernelFutureHandler>();
+
+    var cb = this.sendShellMessage;
+    this._commManager = new comm.CommManager(cb);
 
     if (typeof WebSocket === 'undefined') {
       alert('Your browser does not have WebSocket support, please try Chrome, Safari, or Firefox ≥ 11.');
@@ -646,9 +650,19 @@ class Kernel {
       console.log(error.message);
       return;
     }
-    if (msg.channel === 'iopub' && msg.msgType === 'status') {
-      this._handleStatusMessage(msg);
+
+    if (msg.channel === 'iopub') {
+      if (msg.msgType === 'status') {
+        this._handleStatusMessage(msg);
+      } else if (msg.msgType === 'comm_open') {
+        this._commManager.commOpen(msg);
+      } else if (msg.msgType === 'comm_msg') {
+        this._commManager.commMsg(msg);
+      } else if (msg.msgType === 'comm_close') {
+        this._commManager.commClose(msg);
+      } 
     }
+
     if (msg.parentHeader) {
       var header = (<IKernelMsgHeader>msg.parentHeader);
       var future = this._handlerMap.get(header.msgId);
@@ -702,7 +716,9 @@ class Kernel {
   private _reconnectAttempt = 0;
   private _handlerMap: Map<string, KernelFutureHandler> = null;
   private _iopubHandlers: Map<string, (msg: IKernelMsg) => void> = null;
+  private _commManager: comm.CommManager = null;
   private _status = 'unknown';
+
 }
 
 
