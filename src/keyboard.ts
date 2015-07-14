@@ -5,6 +5,8 @@ import utils = require('./utils');
 import actions = require('./actions');
 
 import IAction = actions.IAction;
+import Signal = phosphor.core.Signal;
+import emit = phosphor.core.emit;
 
 
 /**
@@ -170,7 +172,7 @@ function eventToShortcut(event: KeyboardEvent) : string {
  * Iterate over all the key/values of available shortcuts.
  **/
 function flattenShortTree(tree: any) : { [key: string]: IAction; } {
-  var dct: { [key: string]: any; } = {};
+  var dct: { [key: string]: IAction; } = {};
   for (var key in tree) {
     var value = tree[key];
     if (typeof(value) === 'string') {
@@ -192,14 +194,14 @@ function flattenShortTree(tree: any) : { [key: string]: IAction; } {
 export
 class ShortcutManager {
 
+  static shortcutsChanged = new Signal<ShortcutManager, string>();
+
   /**
    * Construct a ShortcutManager.
    */
-  constructor(delay: number, events: any, actions: actions.ActionHandler, env: any) {
-    this._delay = delay || 800; // delay in milliseconds
-    this._events = events;
+  constructor(delay: number, actions: actions.ActionHandler) {
+    this._delay = delay; // delay in milliseconds
     this._actions = actions;
-    this._actions.extendEnv(env);
     Object.seal(this);
   }
 
@@ -236,7 +238,7 @@ class ShortcutManager {
         );
       }
     }
-    help.sort(function (a, b) {
+    help.sort((a: IAction, b: IAction): number => {
       if (a.help_index === b.help_index) {
         return 0;
       }
@@ -249,7 +251,7 @@ class ShortcutManager {
   }
 
   clearShortcuts() {
-    this._shortcuts = {};
+    this._shortcuts = null;
   }
 
   /**
@@ -295,7 +297,7 @@ class ShortcutManager {
 
     if (!suppressHelpUpdate) {
       // update the keyboard shortcuts notebook help
-      this._events.trigger('rebuild.QuickHelp');
+      emit(this, ShortcutManager.shortcutsChanged, void 0);
     }
   }
 
@@ -309,7 +311,7 @@ class ShortcutManager {
       this.addShortcut(shortcut, shortcuts.get(shortcut), true);
     }
     // update the keyboard shortcuts notebook help
-    this._events.trigger('rebuild.QuickHelp');
+    emit(this, ShortcutManager.shortcutsChanged, void 0);
   }
 
   /**
@@ -327,7 +329,7 @@ class ShortcutManager {
       this._removeLeaf(shortcuts, this._shortcuts);
       if (!suppressHelpUpdate) {
         // update the keyboard shortcuts notebook help
-        this._events.trigger('rebuild.QuickHelp');
+        emit(this, ShortcutManager.shortcutsChanged, void 0);
       }
     } catch (ex) {
       throw ('try to remove non-existing shortcut');
@@ -438,7 +440,7 @@ class ShortcutManager {
    * Find a leaf/node in a subtree of the keyboard shortcut.
    *
    **/
-  private _getLeaf(shortcutArray: string[], tree: any) : any {
+  private _getLeaf(shortcutArray: string[], tree: any) : string {
     if (shortcutArray.length === 1) {
       return tree[shortcutArray[0]];
     } else if (typeof(tree[shortcutArray[0]]) !== 'string') {
@@ -449,9 +451,8 @@ class ShortcutManager {
 
   private _shortcuts: any = null;
   private _delay = 800;
-  private _events: any = null;
   private _actions: actions.ActionHandler = null;
-  private _queue : any[] = null;
+  private _queue : string[] = null;
   private _clearTimeout = -1;
 
 }
