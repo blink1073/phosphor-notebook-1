@@ -171,14 +171,14 @@ function eventToShortcut(event: KeyboardEvent) : string {
  * Flatten a tree of shortcut sequences. 
  * Iterate over all the key/values of available shortcuts.
  **/
-function flattenShortTree(tree: any) : { [key: string]: IAction; } {
+function flattenShortTree(tree: INode) : { [key: string]: IAction; } {
   var dct: { [key: string]: IAction; } = {};
   for (var key in tree) {
     var value = tree[key];
     if (typeof(value) === 'string') {
       dct[key] = value;
     } else {
-      var ftree = flattenShortTree(value);
+      var ftree = flattenShortTree((<INode>value));
       for (var subkey in ftree) {
         dct[key + ',' + subkey] = ftree[subkey];
       }
@@ -376,16 +376,16 @@ class ShortcutManager {
     return (typeof(actionName) !== 'undefined');
   }
 
-  private _isLeaf(shortcutArray: string[], tree: any): boolean {
+  private _isLeaf(shortcutArray: string[], tree: INode): boolean {
     if (shortcutArray.length === 1) {
      return(typeof(tree[shortcutArray[0]]) === 'string');
     } else {
       var subtree = tree[shortcutArray[0]];
-      return this._isLeaf(shortcutArray.slice(1), subtree );
+      return this._isLeaf(shortcutArray.slice(1), (<INode>subtree));
     }
   }
 
-  private _removeLeaf(shortcutArray: string[], tree: any): void {
+  private _removeLeaf(shortcutArray: string[], tree: INode): void {
     if (shortcutArray.length === 1) {
       var currentNode = tree[shortcutArray[0]];
       if (typeof(currentNode) === 'string') {
@@ -394,14 +394,14 @@ class ShortcutManager {
         throw('try to delete non-leaf');
       }
     } else {
-      this._removeLeaf(shortcutArray.slice(1), tree[shortcutArray[0]]);
+      this._removeLeaf(shortcutArray.slice(1), (<INode>tree[shortcutArray[0]]));
       if (Object.keys(tree[shortcutArray[0]]).length === 0) {
         delete tree[shortcutArray[0]];
       }
     }
   }
 
-  private _setLeaf(shortcutArray: string[], actionName: string, tree: any): boolean {
+  private _setLeaf(shortcutArray: string[], actionName: string, tree: INode): boolean {
     var currentNode = tree[shortcutArray[0]];
     if (shortcutArray.length === 1) {
       if (currentNode !== undefined && typeof(currentNode) !== 'string') {
@@ -418,7 +418,8 @@ class ShortcutManager {
       } else {
         tree[shortcutArray[0]] = tree[shortcutArray[0]] || {};
       }
-      this._setLeaf(shortcutArray.slice(1), actionName, tree[shortcutArray[0]]);
+      this._setLeaf(shortcutArray.slice(1), actionName, 
+                    (<INode>tree[shortcutArray[0]]));
       return true;
     }
   }
@@ -440,19 +441,25 @@ class ShortcutManager {
    * Find a leaf/node in a subtree of the keyboard shortcut.
    *
    **/
-  private _getLeaf(shortcutArray: string[], tree: any) : string {
+  private _getLeaf(shortcutArray: string[], tree: INode) : string {
     if (shortcutArray.length === 1) {
-      return tree[shortcutArray[0]];
+      return (<string>tree[shortcutArray[0]]);
     } else if (typeof(tree[shortcutArray[0]]) !== 'string') {
-      return this._getLeaf(shortcutArray.slice(1), tree[shortcutArray[0]]);
+      return this._getLeaf(shortcutArray.slice(1), 
+                           (<INode>tree[shortcutArray[0]]));
     }
     return null;
   }
 
-  private _shortcuts: any = null;
+  private _shortcuts: INode = null;
   private _delay = 800;
   private _actions: actions.ActionHandler = null;
   private _queue : string[] = null;
   private _clearTimeout = -1;
 
+}
+
+
+interface INode {
+  [index: string]: string | INode;
 }
