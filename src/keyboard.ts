@@ -2,6 +2,10 @@
 // Distributed under the terms of the Modified BSD License.
 
 import utils = require('./utils');
+import actions = require('./actions');
+
+import IAction = actions.IAction;
+
 
 /**
  * Setup global keycodes and inverse keycodes.
@@ -14,7 +18,7 @@ import utils = require('./utils');
 
  // These apply to Firefox, (Webkit and IE)
  // This does work **only** on US keyboard.
-var _keycodes = {
+var _keycodes: { [key: string]: number; } = {
   'a': 65, 'b': 66, 'c': 67, 'd': 68, 'e': 69, 'f': 70, 'g': 71, 'h': 72, 'i': 73,
   'j': 74, 'k': 75, 'l': 76, 'm': 77, 'n': 78, 'o': 79, 'p': 80, 'q': 81, 'r': 82,
   's': 83, 't': 84, 'u': 85, 'v': 86, 'w': 87, 'x': 88, 'y': 89, 'z': 90,
@@ -34,12 +38,12 @@ var _keycodes = {
 };
 
 // These apply to Firefox and Opera
-var _mozilla_keycodes = {
+var _mozilla_keycodes: { [key: string]: number; } = {
   '; :': 59, '= +': 61, '- _': 173, 'meta': 224
 };
 
 // This apply to Webkit and IE
-var _ie_keycodes = {
+var _ie_keycodes: { [key: string]: number; } = {
   '; :': 186, '= +': 187, '- _': 189
 };
 
@@ -52,12 +56,12 @@ if (browser === 'Firefox' || browser === 'Opera' || browser === 'Netscape') {
   utils.extend(_keycodes, _ie_keycodes);
 }
 
-var keycodes = new Map<string, number>();
-var invKeycodes = new Map<number, string>();
+var keycodes: { [key: string]: number; } = {};
+var invKeycodes: { [key: number]: string; } = {};
 for (var name in _keycodes) {
-  var names = name.split(' ');
+  var names: string[] = name.split(' ');
   if (names.length === 1) {
-    var n = names[0];
+    var n: string = names[0];
     keycodes[n] = _keycodes[n];
     invKeycodes[_keycodes[n]] = n;
   } else {
@@ -95,9 +99,9 @@ function normalizeShortcut(shortcut: string): string {
   shortcut = shortcut.toLowerCase().replace('cmd', 'meta');
   shortcut = shortcut.replace(/-$/, '_');  // catch shortcuts using '-' key
   shortcut = shortcut.replace(/,$/, 'comma');  // catch shortcuts using '-' key
-  if(shortcut.indexOf(',') !== -1){
-    var sht = shortcut.split(',');
-    sht = _.map(sht, normalizeShortcut);
+  if (shortcut.indexOf(',') !== -1) {
+    var sht: string[] = shortcut.split(',');
+    sht = sht.map(normalizeShortcut);
     return shortcut;
   }
   shortcut = shortcut.replace(/comma/g, ',');  // catch shortcuts using '-' key
@@ -114,9 +118,9 @@ function normalizeShortcut(shortcut: string): string {
 
 
 /**
- * Convert a shortcut (shift-r) to a jQuery Event object
+ * Convert a shortcut (shift-r) to a KeyboardEvent object
  **/
-function shortcutToEvent(shortcut, type) {
+function shortcutToEvent(shortcut: string, type?: string): KeyboardEvent {
   type = type || 'keydown';
   shortcut = normalizeShortcut(shortcut);
   shortcut = shortcut.replace(/-$/, '_');  // catch shortcuts using '-' key
@@ -128,7 +132,10 @@ function shortcutToEvent(shortcut, type) {
   if (modifiers.indexOf('ctrl') !== -1) {opts.ctrlKey = true;}
   if (modifiers.indexOf('meta') !== -1) {opts.metaKey = true;}
   if (modifiers.indexOf('shift') !== -1) {opts.shiftKey = true;}
-  return $.Event(type, opts);
+  var evt = new KeyboardEvent();
+  evt.key = key;
+  utils.extend(evt, opts);
+  return evt;
 };
 
 
@@ -144,7 +151,7 @@ function onlyModifierEvent(event: KeyboardEvent) : boolean {
 
 
 /**
- * Convert a jQuery Event object to a normalized shortcut string (shift-r).
+ * Convert an Event object to a normalized shortcut string (shift-r).
  **/
 function eventToShortcut(event: KeyboardEvent) : string {
   var shortcut = '';
@@ -160,18 +167,18 @@ function eventToShortcut(event: KeyboardEvent) : string {
 
 /**
  * Flatten a tree of shortcut sequences. 
- * use full to iterate over all the key/values of available shortcuts.
+ * Iterate over all the key/values of available shortcuts.
  **/
-function flattenShortTree(tree: any) : any {
-  var  dct = {};
-  for(var key in tree){
+function flattenShortTree(tree: any) : { [key: string]: IAction; } {
+  var dct: { [key: string]: any; } = {};
+  for (var key in tree) {
     var value = tree[key];
-    if(typeof(value) === 'string'){
+    if (typeof(value) === 'string') {
       dct[key] = value;
     } else {
       var ftree = flattenShortTree(value);
-      for(var subkey in ftree){
-        dct[key+','+subkey] = ftree[subkey];
+      for (var subkey in ftree) {
+        dct[key + ',' + subkey] = ftree[subkey];
       }
     } 
   }
@@ -188,11 +195,11 @@ class ShortcutManager {
   /**
    * Construct a ShortcutManager.
    */
-  constructor(delay: number, events: any, actions: any, env: any) {
+  constructor(delay: number, events: any, actions: actions.ActionHandler, env: any) {
     this._delay = delay || 800; // delay in milliseconds
     this._events = events;
     this._actions = actions;
-    this._actions.extend_env(env);
+    this._actions.extendEnv(env);
     Object.seal(this);
   }
 
@@ -200,28 +207,28 @@ class ShortcutManager {
    * Clear the pending shortcut soon, and cancel previous clearing
    * that might be registered.
    **/ 
-  clearSoon(){
-     clearTimeout(this._cleartimeout);
-     this._cleartimeout = setTimeout(() => {this.clearQueue();}, this._delay);
+  clearSoon() {
+     clearTimeout(this._clearTimeout);
+     this._clearTimeout = setTimeout(() => {this.clearQueue();}, this._delay);
   }
 
   /**
    * Clear the pending shortcut sequence now. 
    **/
-  clearQueue(){
+  clearQueue() {
     this._queue = [];
-    clearTimeout(this._cleartimeout);
+    clearTimeout(this._clearTimeout);
   }
 
-  help() {
-    var help = [];
+  help(): IAction[] {
+    var help: IAction[] = [];
     var ftree = flattenShortTree(this._shortcuts);
     for (var shortcut in ftree) {
-      var action = this._actions.get(ftree[shortcut]);
-      var helpString = action.help || '== no help ==';
-      var helpIndex = action.help_index;
+      var action = this._actions.get(shortcut);
+      var helpString: string = action.help || '== no help ==';
+      var helpIndex: string = action.help_index;
       if (helpString) {
-        var shortstring = (action.shortstring || shortcut);
+        var shortstring: string = (action.shortstring || shortcut);
         help.push({
           shortcut: shortstring,
           help: helpString,
@@ -233,7 +240,7 @@ class ShortcutManager {
       if (a.help_index === b.help_index) {
         return 0;
       }
-      if (a.help_index === undefined || a.help_index > b.help_index){
+      if (a.help_index === undefined || a.help_index > b.help_index) {
         return 1;
       }
       return -1;
@@ -251,7 +258,7 @@ class ShortcutManager {
    **/
   getShortcut(shortcut: string | string[]): any {
     var shortcuts: string[];
-    if(typeof(shortcut) === 'string'){
+    if (typeof(shortcut) === 'string') {
       shortcuts = (<string>shortcut).split(',');
     } else {
       shortcuts = (<string[]>shortcut);
@@ -261,7 +268,7 @@ class ShortcutManager {
 
   setShortcut(shortcut: string | string[], actionName: string): boolean {
     var shortcuts: string[];
-    if(typeof(shortcut) === 'string'){
+    if (typeof(shortcut) === 'string') {
       shortcuts = (<string>shortcut).split(',');
     } else {
       shortcuts = (<string[]>shortcut);
@@ -279,7 +286,7 @@ class ShortcutManager {
    **/
   addShortcut(shortcut: string, data: any, suppressHelpUpdate: boolean): void {
     var action_name = this._actions.get_name(data);
-    if (! action_name){
+    if (!action_name) {
       throw('does not know how to deal with ', data);
     }
     
@@ -299,7 +306,7 @@ class ShortcutManager {
    **/
   addShortcuts(shortcuts: Map<string, any>) : void {
     for (var shortcut in shortcuts) {
-      this.addShortcut(shortcut, shortcuts[shortcut], true);
+      this.addShortcut(shortcut, shortcuts.get(shortcut), true);
     }
     // update the keyboard shortcuts notebook help
     this._events.trigger('rebuild.QuickHelp');
@@ -311,22 +318,19 @@ class ShortcutManager {
    **/
   removeShortcut(shortcut: string, suppressHelpUpdate: boolean): void {
     shortcut = normalizeShortcut(shortcut);
-    if( typeof(shortcut) === 'string'){
-      shortcut = shortcut.split(',');
-    }
+    var shortcuts = this._getShortcutList(shortcut)
     /*
      *  The shortcut error should be explicit here, because it will be
      *  seen by users.
      */
-    try
-    {
-    this._removeLeaf(shortcut, this._shortcuts);
-    if (!suppressHelpUpdate) {
-      // update the keyboard shortcuts notebook help
-      this._events.trigger('rebuild.QuickHelp');
-    }
+    try {
+      this._removeLeaf(shortcuts, this._shortcuts);
+      if (!suppressHelpUpdate) {
+        // update the keyboard shortcuts notebook help
+        this._events.trigger('rebuild.QuickHelp');
+      }
     } catch (ex) {
-    throw ('try to remove non-existing shortcut');
+      throw ('try to remove non-existing shortcut');
     }
   }
 
@@ -340,37 +344,38 @@ class ShortcutManager {
    * return false is event wan handled, true otherwise 
    * in any case returning false stop event propagation
    **/
-  callHandler(event) : boolean {
+  callHandler(event: KeyboardEvent): boolean {
     this.clearSoon();
-    if(onlyModifierEvent(event)){
+    if (onlyModifierEvent(event)) {
       return true;
     }
     var shortcut = eventToShortcut(event);
     this._queue.push(shortcut);
-    var action_name = this.getShortcut(this._queue);
+    var actionName = this.getShortcut(this._queue);
 
-    if (typeof(action_name) === 'undefined'|| action_name === null){
+    if (typeof(actionName) === 'undefined'|| actionName === null) {
       this.clearQueue();
       return true;
     }
     
-    if (this._actions.exists(action_name)) {
+    if (this._actions.exists(actionName)) {
       event.preventDefault();
       this.clearQueue();
-      return this._actions.call(action_name, event);
+      this._actions.call(actionName, event);
+      return true;
     }
 
     return false;
   }
 
-  handles(event) : boolean {
+  handles(event: KeyboardEvent) : boolean {
     var shortcut = eventToShortcut(event);
     var actionName = this.getShortcut(this._queue.concat(shortcut));
     return (typeof(actionName) !== 'undefined');
   }
 
-  private _isLeaf(shortcutArray, tree): boolean {
-    if(shortcutArray.length === 1){
+  private _isLeaf(shortcutArray: string[], tree: any): boolean {
+    if (shortcutArray.length === 1) {
      return(typeof(tree[shortcutArray[0]]) === 'string');
     } else {
       var subtree = tree[shortcutArray[0]];
@@ -378,34 +383,34 @@ class ShortcutManager {
     }
   }
 
-  private _removeLeaf(shortcutArray, tree, allowNode): void {
-    if(shortcutArray.length === 1){
+  private _removeLeaf(shortcutArray: string[], tree: any): void {
+    if (shortcutArray.length === 1) {
       var currentNode = tree[shortcutArray[0]];
-      if(typeof(currentNode) === 'string'){
+      if (typeof(currentNode) === 'string') {
         delete tree[shortcutArray[0]];
       } else {
         throw('try to delete non-leaf');
       }
     } else {
-      this._removeLeaf(shortcutArray.slice(1), tree[shortcutArray[0]], allowNode);
-      if(_.keys(tree[shortcutArray[0]]).length === 0){
+      this._removeLeaf(shortcutArray.slice(1), tree[shortcutArray[0]]);
+      if (Object.keys(tree[shortcutArray[0]]).length === 0) {
         delete tree[shortcutArray[0]];
       }
     }
   }
 
-  private _setLeaf(shortcutArray, actionName, tree): boolean {
+  private _setLeaf(shortcutArray: string[], actionName: string, tree: any): boolean {
     var currentNode = tree[shortcutArray[0]];
-    if(shortcutArray.length === 1){
-      if(currentNode !== undefined && typeof(currentNode) !== 'string'){
+    if (shortcutArray.length === 1) {
+      if (currentNode !== undefined && typeof(currentNode) !== 'string') {
         console.warn('[warning], you are overriting a long shortcut with a shorter one');
       }
       tree[shortcutArray[0]] = actionName;
       return true;
     } else {
-      if(typeof(currentNode) === 'string'){
-        console.warn('you are trying to set a shortcut that will be shadowed'+
-               'by a more specific one. Aborting for :', actionName, 'the follwing '+
+      if (typeof(currentNode) === 'string') {
+        console.warn('you are trying to set a shortcut that will be shadowed' +
+               'by a more specific one. Aborting for :', actionName, 'the follwing  '+
                'will take precedence', currentNode);
         return false;
       } else {
@@ -421,7 +426,7 @@ class ShortcutManager {
    */
   private _getShortcutList(shortcut: string | string[]): string[] {
     var shortcuts: string[];
-    if(typeof(shortcut) === 'string'){
+    if (typeof(shortcut) === 'string') {
       shortcuts = (<string>shortcut).split(',');
     } else {
       shortcuts = (<string[]>shortcut);
@@ -433,11 +438,11 @@ class ShortcutManager {
    * Find a leaf/node in a subtree of the keyboard shortcut.
    *
    **/
-  private _getLeaf(shortcut_array, tree) : Tree {
-    if(shortcut_array.length === 1){
-      return tree[shortcut_array[0]];
-    } else if(  typeof(tree[shortcut_array[0]]) !== 'string'){
-      return this._getLeaf(shortcut_array.slice(1), tree[shortcut_array[0]]);
+  private _getLeaf(shortcutArray: string[], tree: any) : any {
+    if (shortcutArray.length === 1) {
+      return tree[shortcutArray[0]];
+    } else if (typeof(tree[shortcutArray[0]]) !== 'string') {
+      return this._getLeaf(shortcutArray.slice(1), tree[shortcutArray[0]]);
     }
     return null;
   }
@@ -445,8 +450,8 @@ class ShortcutManager {
   private _shortcuts: any = null;
   private _delay = 800;
   private _events: any = null;
-  private _actions: any = null;
+  private _actions: actions.ActionHandler = null;
   private _queue : any[] = null;
-  private _cleartimeout = null;
+  private _clearTimeout = -1;
 
 }
