@@ -142,7 +142,7 @@ class CommManager {
     return promise;
   }
     
-  private _targets: Map<string, () => void>;
+  private _targets: Map<string, () => void> = null;
   private _comms: Map<string, Promise<Comm>> = null;
   private _sendFunc: () => IKernelFuture = null;
 }
