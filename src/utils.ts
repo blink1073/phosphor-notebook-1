@@ -99,6 +99,25 @@ var browser: string[] = (() => {
 })();
 
 
+/**
+ * Properly detect the current platform.
+ * http://stackoverflow.com/questions/11219582/how-to-detect-my-browser-version-and-operating-system-using-javascript
+ */
+export 
+var platform: string = (() => {
+  if (typeof navigator === 'undefined') {
+    // navigator undefined in node
+    return 'None';
+  }
+  var OSName="None";
+  if (navigator.appVersion.indexOf("Win")!=-1) OSName="Windows";
+  if (navigator.appVersion.indexOf("Mac")!=-1) OSName="MacOS";
+  if (navigator.appVersion.indexOf("X11")!=-1) OSName="UNIX";
+  if (navigator.appVersion.indexOf("Linux")!=-1) OSName="Linux";
+  return OSName;
+})();
+
+
 /** 
  * Return a serialized object string suitable for a query.
  *
