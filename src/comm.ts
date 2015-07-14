@@ -11,7 +11,7 @@ import IKernelFuture = kernel.IKernelFuture;
 
 
 /**
- * CommManager class
+ * CommManager class.
  */
 export 
 class CommManager {
