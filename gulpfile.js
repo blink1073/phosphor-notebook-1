@@ -8,6 +8,7 @@ var rename = require('gulp-rename');
 var del = require('del');
 var typedoc = require('gulp-typedoc');
 var typescript = require('typescript');
+var karma = require('karma').server;
 
 
 var typings = [
@@ -16,6 +17,11 @@ var typings = [
     "./logger.d.ts",
     "./components/phosphor/dist/phosphor.d.ts",
 ];
+
+var testsTypings = typings.concat([
+  './typings/expect.js/expect.js.d.ts',
+  './typings/mocha/mocha.d.ts'
+]);
 
 var tsSources = [
     "index",
@@ -73,6 +79,34 @@ gulp.task('dist', ['build'], function() {
 
 gulp.task('watch', function() {
   gulp.watch(tsSources, ['src']);
+});
+
+
+gulp.task('tests', function() {
+  var project = gulpTypescript.createProject({
+    typescript: typescript,
+    experimentalDecorators: true,
+    declarationFiles: false,
+    noImplicitAny: true,
+    target: 'ES5',
+  });
+
+  var sources = testsTypings.concat([
+    //'dist/phosphor-notebook.d.ts',
+    'tests/**/*.ts'
+  ]);
+  return gulp.src(sources)
+    .pipe(gulpTypescript(project))
+    .pipe(concat('index.js'))
+    .pipe(header('"use strict";\n'))
+    .pipe(gulp.dest('tests/build')); 
+});
+
+
+gulp.task('karma', function () {
+  karma.start({
+    configFile: __dirname + '/tests/karma.conf.js',
+  });
 });
 
 

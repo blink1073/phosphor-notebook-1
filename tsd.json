@@ -22,6 +22,12 @@
     },
     "requirejs/require.d.ts": {
       "commit": "7c374bf1e59ce14e9e28207e2ba2ab202ba55350"
+    },
+    "expect.js/expect.js.d.ts": {
+      "commit": "eb75fdf39e21adcca4fbcd975c79a96a42d07535"
+    },
+    "mocha/mocha.d.ts": {
+      "commit": "9cf502e3c1a8532f92ee0114e46509175e790938"
     }
   }
 }
