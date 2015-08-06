@@ -7,6 +7,8 @@
 |----------------------------------------------------------------------------*/
 module tests {
 
+import Kernel = kernel.Kernel;
+
 describe('phosphor-notebook - kernel', () => {
 
   describe('Kernel', () => {
@@ -16,7 +18,7 @@ describe('phosphor-notebook - kernel', () => {
       it('should return true on success', () => {
         var d1 = true;
         expect(d1).to.be(true);
-        console.log(kernel.Kernel);
+        console.log(Kernel);
       });
 
     });
